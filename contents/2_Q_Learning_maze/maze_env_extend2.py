@@ -1,14 +1,6 @@
 """
 Reinforcement learning maze example.
 
-Red rectangle:          explorer.
-Black rectangles:       hells       [reward = -1].
-Yellow bin circle:      paradise    [reward = +1].
-All other states:       ground      [reward = 0].
-
-This script is the environment part of this example. The RL is in RL_brain.py.
-
-View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
 
@@ -22,8 +14,15 @@ else:
 
 
 UNIT = 40   # pixels
-MAZE_H = 4  # grid height
-MAZE_W = 4  # grid width
+MAZE_H = 6  # grid height
+MAZE_W = 6  # grid width
+OBSTACLE_MAT = np.array([[0,0,0,1,0,0],
+                         [0,1,1,0,0,0],
+                         [0,0,0,0,1,0],
+                         [0,1,1,0,0,0],
+                         [0,0,1,0,1,0],
+                         [1,0,0,0,0,0]
+                         ])
 
 class Maze(tk.Tk, object):
     def __init__(self):
@@ -33,6 +32,7 @@ class Maze(tk.Tk, object):
         self.title('maze')
         self.geometry('{0}x{1}'.format(MAZE_H * UNIT, MAZE_H * UNIT))
         self._build_maze()
+        self.dist = 0
 
     def _build_maze(self):
         self.canvas = tk.Canvas(self, bg='white',
@@ -49,17 +49,20 @@ class Maze(tk.Tk, object):
 
         # create origin
         origin = np.array([20, 20])
-        hell1_center = origin + np.array([UNIT * 2, UNIT])
-        self.hell1 = self.canvas.create_rectangle(
-            hell1_center[0] - 15, hell1_center[1] - 15,
-            hell1_center[0] + 15, hell1_center[1] + 15,
-            fill='black')
-        # hell
-        hell2_center = origin + np.array([UNIT, UNIT * 2])
-        self.hell2 = self.canvas.create_rectangle(
-            hell2_center[0] - 15, hell2_center[1] - 15,
-            hell2_center[0] + 15, hell2_center[1] + 15,
-            fill='black')
+        # 障碍物
+        # obstacle
+        self.obstacle = []
+        for row in range(OBSTACLE_MAT.shape[0]):
+            for col in range(OBSTACLE_MAT.shape[1]):
+                if OBSTACLE_MAT[row,col]:
+                    rec_center = origin + np.array([UNIT * col, UNIT * row])
+                    self.obstacle.append(
+                        self.canvas.create_rectangle(
+                            rec_center[0] - 15, rec_center[1] - 15,
+                            rec_center[0] + 15, rec_center[1] + 15,
+                            fill='black'
+                        )
+                    )
 
         # create oval
         oval_center = origin + np.array([UNIT * (MAZE_W-1), UNIT * (MAZE_H-1)])
@@ -76,6 +79,13 @@ class Maze(tk.Tk, object):
 
         # pack all
         self.canvas.pack()
+
+        # obstacle coordinate
+        self.obstacle_coordinate = []
+        for obs in self.obstacle:
+            self.obstacle_coordinate.append(self.canvas.coords(obs))
+        # 初始化距离
+        self.dist = self.distance(self.canvas.coords(self.oval), self.canvas.coords(self.rect))
 
     def reset(self):
         self.update()
@@ -106,40 +116,36 @@ class Maze(tk.Tk, object):
                 base_action[0] -= UNIT
 
         self.canvas.move(self.rect, base_action[0], base_action[1])  # move agent
-
         s_ = self.canvas.coords(self.rect)  # next state
-
         # reward function
-        if s_ == self.canvas.coords(self.oval):
-            reward = 5
+        # 每一步移动，如过离目标点更近，获得正奖励
+        # 如果没有更近，获得负奖励
+        # 碰到障碍物，最大负奖励
+        # 到达重点，最大正奖励
+        new_dist = self.distance(self.canvas.coords(self.oval), s_)
+        if(s_ in self.obstacle_coordinate or 0 == self.distance(s,s_)):
+            # 碰到障碍物 或者因为到达墙壁原地不动
+            reward = -50
             done = True
             s_ = 'terminal'
-        elif s_ in [self.canvas.coords(self.hell1), self.canvas.coords(self.hell2)]:
-            reward = -5
+        elif new_dist == 0: # 到达终点
+            reward = 50
             done = True
             s_ = 'terminal'
-        else:
-            reward = 0
+        elif new_dist < self.dist: # 离终点更近
+            reward = 1
             done = False
-
+        else:
+            reward = -1
+            done = False
+        self.dist = new_dist
         return s_, reward, done
 
     def render(self):
         time.sleep(0.05) # 每一步的更新时间
         self.update()
 
-
-# def update():
-#     for t in range(10):
-#         s = env.reset()
-#         while True:
-#             env.render()
-#             a = 1
-#             s, r, done = env.step(a)
-#             if done:
-#                 break
-#
-# if __name__ == '__main__':
-#     env = Maze()
-#     env.after(100, update)
-#     env.mainloop()
+    def distance(self, obs1, obs2): # 计算两个位置之间的距离
+        center1 = np.array([(obs1[0] + obs1[2])/2, (obs1[1] + obs1[3])/2])
+        center2 = np.array([(obs2[0] + obs2[2]) / 2, (obs2[1] + obs2[3]) / 2])
+        return ((center1[0] - center2[0])**2 + (center1[1] - center2[1])**2)**0.5

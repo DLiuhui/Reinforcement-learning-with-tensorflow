@@ -1,14 +1,6 @@
 """
 Reinforcement learning maze example.
 
-Red rectangle:          explorer.
-Black rectangles:       hells       [reward = -1].
-Yellow bin circle:      paradise    [reward = +1].
-All other states:       ground      [reward = 0].
-
-This script is the environment part of this example. The RL is in RL_brain.py.
-
-View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
 
@@ -22,8 +14,15 @@ else:
 
 
 UNIT = 40   # pixels
-MAZE_H = 4  # grid height
-MAZE_W = 4  # grid width
+MAZE_H = 6  # grid height
+MAZE_W = 6  # grid width
+OBSTACLE_MAT = np.array([[0,0,0,1,0,0],
+                         [0,1,1,0,0,0],
+                         [0,0,0,0,1,0],
+                         [0,1,1,0,1,0],
+                         [0,0,1,0,0,0],
+                         [1,0,0,0,1,0]
+                         ])
 
 class Maze(tk.Tk, object):
     def __init__(self):
@@ -49,17 +48,20 @@ class Maze(tk.Tk, object):
 
         # create origin
         origin = np.array([20, 20])
-        hell1_center = origin + np.array([UNIT * 2, UNIT])
-        self.hell1 = self.canvas.create_rectangle(
-            hell1_center[0] - 15, hell1_center[1] - 15,
-            hell1_center[0] + 15, hell1_center[1] + 15,
-            fill='black')
-        # hell
-        hell2_center = origin + np.array([UNIT, UNIT * 2])
-        self.hell2 = self.canvas.create_rectangle(
-            hell2_center[0] - 15, hell2_center[1] - 15,
-            hell2_center[0] + 15, hell2_center[1] + 15,
-            fill='black')
+        # 障碍物
+        # obstacle
+        self.obstacle = []
+        for row in range(OBSTACLE_MAT.shape[0]):
+            for col in range(OBSTACLE_MAT.shape[1]):
+                if OBSTACLE_MAT[row,col]:
+                    rec_center = origin + np.array([UNIT * col, UNIT * row])
+                    self.obstacle.append(
+                        self.canvas.create_rectangle(
+                            rec_center[0] - 15, rec_center[1] - 15,
+                            rec_center[0] + 15, rec_center[1] + 15,
+                            fill='black'
+                        )
+                    )
 
         # create oval
         oval_center = origin + np.array([UNIT * (MAZE_W-1), UNIT * (MAZE_H-1)])
@@ -76,6 +78,11 @@ class Maze(tk.Tk, object):
 
         # pack all
         self.canvas.pack()
+
+        # obstacle coordinate
+        self.obstacle_coordinate = []
+        for obs in self.obstacle:
+            self.obstacle_coordinate.append(self.canvas.coords(obs))
 
     def reset(self):
         self.update()
@@ -106,20 +113,19 @@ class Maze(tk.Tk, object):
                 base_action[0] -= UNIT
 
         self.canvas.move(self.rect, base_action[0], base_action[1])  # move agent
-
         s_ = self.canvas.coords(self.rect)  # next state
-
+        print(s_)
         # reward function
         if s_ == self.canvas.coords(self.oval):
-            reward = 5
+            reward = 10
             done = True
             s_ = 'terminal'
-        elif s_ in [self.canvas.coords(self.hell1), self.canvas.coords(self.hell2)]:
-            reward = -5
+        elif s_ in self.obstacle_coordinate:
+            reward = -10
             done = True
             s_ = 'terminal'
         else:
-            reward = 0
+            reward = 1
             done = False
 
         return s_, reward, done
@@ -127,19 +133,3 @@ class Maze(tk.Tk, object):
     def render(self):
         time.sleep(0.05) # 每一步的更新时间
         self.update()
-
-
-# def update():
-#     for t in range(10):
-#         s = env.reset()
-#         while True:
-#             env.render()
-#             a = 1
-#             s, r, done = env.step(a)
-#             if done:
-#                 break
-#
-# if __name__ == '__main__':
-#     env = Maze()
-#     env.after(100, update)
-#     env.mainloop()

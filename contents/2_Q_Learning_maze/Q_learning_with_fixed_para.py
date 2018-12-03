@@ -1,38 +1,37 @@
 """
 Reinforcement learning maze example.
 
-Red rectangle:          explorer.
-Black rectangles:       hells       [reward = -1].
-Yellow bin circle:      paradise    [reward = +1].
-All other states:       ground      [reward = 0].
-
-This script is the main part which controls the update method of this example.
-The RL is in RL_brain.py.
-
-View more on my tutorial page: https://morvanzhou.github.io/tutorials/
 """
 
-from maze_env_extend import Maze
-from RL_brain import QLearningTable
+# from maze_env_extend import Maze
+from maze_env_extend2 import Maze
+from RL import QLearning
+import numpy as np
+import matplotlib.pyplot as plt
 
+def transfunc(x, start, end):
+    range = end - start
+    if (x-start)/range > 0.5:
+        return 1/(1 + (np.e**(10*(0.5-(x-start)/range))))
+    else:
+        return (x-start)/range
 
 def update(RL, iteration=100):
+    RL.q_func = np.zeros(iteration)
     for episode in range(iteration):
         # initial observation
         observation = env.reset()
-
         while True:
             # fresh env
             env.render()
 
             # RL choose action based on observation
-            action = RL.choose_action(str(observation))
+            action = RL.chooseAction(str(observation))
 
             # RL take action and get next observation and reward
             observation_, reward, done = env.step(action)
-
             # RL learn from this transition
-            RL.learn(str(observation), action, reward, str(observation_))
+            RL.learning(str(observation), action, str(observation_), reward, episode)
 
             # swap observation
             observation = observation_
@@ -44,11 +43,14 @@ def update(RL, iteration=100):
     # end of game
     print('game over')
     env.destroy()
+    plt.figure(1)
+    plt.plot(np.arange(iteration), RL.q_func)
+    plt.savefig("running_in_fixed_parameters.png")
 
 if __name__ == "__main__":
     env = Maze()
-    RL = QLearningTable(actions=list(range(env.n_actions)))
-    iteration = 100
+    RL = QLearning(actions=list(range(env.n_actions)), learning_rate=0.05, reward_decay=0.9, e_greedy=0.9)
+    iteration = 1000
     # 开始运行
     env.after(100, update(RL, iteration))
     env.mainloop()
