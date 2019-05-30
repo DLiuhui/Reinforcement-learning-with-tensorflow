@@ -76,8 +76,8 @@ class DeepQNetwork:
         self.q_target = tf.placeholder(tf.float32, [None, self.n_actions], name='Q_target')  # for calculating loss
         with tf.variable_scope('eval_net', reuse=tf.AUTO_REUSE):
             # c_names(collections_names) are the collections to store variables
-            c_names, n_l1, w_initializer, b_initializer = \
-                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 10, \
+            c_names, n_l1, n_l2, w_initializer, b_initializer = \
+                ['eval_net_params', tf.GraphKeys.GLOBAL_VARIABLES], 30, 15, \
                 tf.random_normal_initializer(0., 0.3), tf.constant_initializer(0.1)  # config of layers
 
             # first layer. collections is used later when assign to target net
@@ -88,9 +88,14 @@ class DeepQNetwork:
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2', reuse=tf.AUTO_REUSE):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_eval = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [n_l1, n_l2], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, n_l2], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            with tf.variable_scope('l3', reuse=tf.AUTO_REUSE):
+                w3 = tf.get_variable('w3', [n_l2, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_eval = tf.matmul(l2, w3) + b3
 
         with tf.variable_scope('loss', reuse=tf.AUTO_REUSE):
             # 损失函数计算的是两个向量之间的差值
@@ -112,9 +117,14 @@ class DeepQNetwork:
 
             # second layer. collections is used later when assign to target net
             with tf.variable_scope('l2', reuse=tf.AUTO_REUSE):
-                w2 = tf.get_variable('w2', [n_l1, self.n_actions], initializer=w_initializer, collections=c_names)
-                b2 = tf.get_variable('b2', [1, self.n_actions], initializer=b_initializer, collections=c_names)
-                self.q_next = tf.matmul(l1, w2) + b2
+                w2 = tf.get_variable('w2', [n_l1, n_l2], initializer=w_initializer, collections=c_names)
+                b2 = tf.get_variable('b2', [1, n_l2], initializer=b_initializer, collections=c_names)
+                l2 = tf.nn.relu(tf.matmul(l1, w2) + b2)
+
+            with tf.variable_scope('l3', reuse=tf.AUTO_REUSE):
+                w3 = tf.get_variable('w3', [n_l2, self.n_actions], initializer=w_initializer, collections=c_names)
+                b3 = tf.get_variable('b3', [1, self.n_actions], initializer=b_initializer, collections=c_names)
+                self.q_next = tf.matmul(l2, w3) + b3
             # target net 不进行梯度下降更新，可以看出双网络特性：一个实时更新，一个定期用另一个网络的新值更新自己
 
     def store_transition(self, s, a, r, s_):
@@ -177,32 +187,6 @@ class DeepQNetwork:
         # 更新动作
         q_target[batch_index, eval_act_index] = reward + self.gamma * np.max(q_next, axis=1)
 
-        """
-        For example in this batch I have 2 samples and 3 actions:
-        q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        q_target = q_eval =
-        [[1, 2, 3],
-         [4, 5, 6]]
-
-        Then change q_target with the real q_target value w.r.t the q_eval's action.
-        For example in:
-            sample 0, I took action 0, and the max q_target value is -1;
-            sample 1, I took action 2, and the max q_target value is -2:
-        q_target =
-        [[-1, 2, 3],
-         [4, 5, -2]]
-
-        So the (q_target - q_eval) becomes:
-        [[(-1)-(1), 0, 0],
-         [0, 0, (-2)-(6)]]
-
-        We then backpropagate this error w.r.t the corresponding action to network,
-        leave other action as error=0 cause we didn't choose it.
-        """
-
         # train eval network
         _, self.cost = self.sess.run([self._train_op, self.loss],
                                      feed_dict={self.s: batch_memory[:, :self.n_features],
@@ -215,10 +199,11 @@ class DeepQNetwork:
 
     def plot_cost(self, num, replace_step):
         import matplotlib.pyplot as plt
+        plt.figure(num)
         plt.plot(np.arange(len(self.cost_his)), self.cost_his)
         plt.ylabel('Cost')
         plt.xlabel('training steps')
-        name = 'extend_env_' + str(num) + '_s' + str(replace_step) + '.png'
+        name = 'extend_env_extend_nn_' + str(num) + '_s' + str(replace_step) + '.png'
         plt.savefig(name)
         # plt.show()
 

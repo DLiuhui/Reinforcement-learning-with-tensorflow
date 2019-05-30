@@ -22,9 +22,10 @@ class QLearningTable:
         # action selection
         if np.random.uniform() < self.epsilon:
             # choose best action
-            state_action = self.q_table.ix[observation, :]
+            state_action = self.q_table.loc[observation, :]
             state_action = state_action.reindex(np.random.permutation(state_action.index))     # some actions have same value
-            action = state_action.argmax()
+            action = np.random.choice(state_action[state_action == np.max(state_action)].index)
+            # action = state_action.argmax()
         else:
             # choose random action
             action = np.random.choice(self.actions)

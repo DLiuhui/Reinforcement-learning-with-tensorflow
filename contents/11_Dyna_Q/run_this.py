@@ -38,6 +38,7 @@ def update():
                 break
 
     # end of game
+    print(env_model.database)
     print('game over')
     env.destroy()
 

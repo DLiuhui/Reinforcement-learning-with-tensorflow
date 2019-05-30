@@ -96,6 +96,7 @@ class PolicyGradient:
     def learn(self):
         # discount and normalize episode reward
         discounted_ep_rs_norm = self._discount_and_norm_rewards()
+        print(discounted_ep_rs_norm)
 
         # train on episode
         self.sess.run(self.train_op, feed_dict={
@@ -103,7 +104,6 @@ class PolicyGradient:
              self.tf_acts: np.array(self.ep_as),  # shape=[None, ]
              self.tf_vt: discounted_ep_rs_norm,  # shape=[None, ]
         })
-
         self.ep_obs, self.ep_as, self.ep_rs = [], [], []    # empty episode data
         return discounted_ep_rs_norm
 
